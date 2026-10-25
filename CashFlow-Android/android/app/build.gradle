@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'id.ilham.cashflow'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "id.ilham.cashflow"
+        minSdk 29          // Android 10+
+        targetSdk 34
+        versionCode 130
+        versionName "1.3.0"
+    }
+
+    // Tanda tangan tetap agar APK versi baru bisa dipasang DI ATAS versi lama (data tidak hilang).
+    // Untuk pemakaian pribadi (sideload). Repository wajib Private; jangan dipakai untuk Play Store.
+    signingConfigs {
+        cashflow {
+            storeFile file('cashflow.jks')
+            storePassword 'cashflowpass'
+            keyAlias 'cashflow'
+            keyPassword 'cashflowpass'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.cashflow
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.cashflow
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Sumber tunggal aplikasi web ada di ../webapp/www  ->  di APK menjadi assets/www
+    sourceSets {
+        main {
+            assets.srcDir file("$rootDir/../webapp")
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
