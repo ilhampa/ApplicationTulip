@@ -1,0 +1,57 @@
+name: Build APK CashFlow
+
+on:
+  workflow_dispatch:          # tombol "Run workflow" manual
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Siapkan file web (index.html)
+        run: |
+          mkdir -p webapp/www
+          # File CashFlow*.html di root repository (bila ada) dipakai sebagai aplikasi web
+          f=$(find . -maxdepth 1 -type f -iname 'cashflow*.html' | sort | tail -n 1)
+          if [ -n "$f" ]; then echo "Memakai $f"; cp "$f" webapp/www/index.html; fi
+          test -f webapp/www/index.html || { echo "::error::File web tidak ditemukan. Unggah CashFlow_v1.3.0.html ke root repository (atau simpan sebagai webapp/www/index.html)."; exit 1; }
+          grep -q "AndroidBridge" webapp/www/index.html || { echo "::error::Bukan file CashFlow yang benar (jembatan Android tidak ditemukan)."; exit 1; }
+          grep -q "syncReminders" webapp/www/index.html || { echo "::error::Gunakan CashFlow v1.3.0 atau lebih baru (butuh fitur pengingat)."; exit 1; }
+          ls -l webapp/www
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Uji mandiri jadwal pengingat
+        run: |
+          mkdir -p /tmp/rt
+          javac -encoding UTF-8 -d /tmp/rt android/app/src/main/java/id/ilham/cashflow/ReminderMath.java tools/ReminderSelfTest.java
+          java -cp /tmp/rt id.ilham.cashflow.ReminderSelfTest
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        run: gradle -p android assembleDebug --no-daemon --stacktrace
+
+      - name: Periksa & beri nama APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$APK" | grep -E "assets/www/index.html|classes.dex|AndroidManifest.xml"
+          cp "$APK" CashFlow_v1.3.0.apk
+          AS=$(ls $ANDROID_HOME/build-tools/*/apksigner 2>/dev/null | tail -n 1)
+          if [ -n "$AS" ]; then "$AS" verify --print-certs CashFlow_v1.3.0.apk || true; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CashFlow_APK
+          path: CashFlow_v1.3.0.apk
+          if-no-files-found: error
